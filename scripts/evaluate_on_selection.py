@@ -17,12 +17,14 @@
 """
 from optparse import OptionParser
 import logging
-import os
+import os, sys
+from web.embedding import Embedding
 from web.embeddings import fetch_GloVe, load_embedding
 from web.datasets.utils import _get_dataset_dir
+import pandas as pd
+import numpy as np
 
-from web.evaluate import evaluate_on_all
-
+from web.evaluate import evaluate_on_all, evaluate_on_selection
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s %(levelname)s:%(message)s', level=logging.DEBUG, datefmt='%I:%M:%S')
@@ -49,16 +51,24 @@ parser.add_option("-c", "--clean_words", dest="clean_words",
 if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
+    out_fname = options.output if options.output else "results_selection.csv"
+    results = None
+    if os.path.exists(out_fname):
+        results = pd.read_csv(out_fname)
+    pd.set_option('display.max_columns', 500)
+    pd.set_option('display.width', 1000)
+
     # Load embeddings
     fname = options.filename
     if not fname:
-        w = fetch_GloVe(corpus="wiki-6B", dim=300)
+        w = fetch_GloVe(corpus="wiki-6B", dim=50)
     else:
         if not os.path.isabs(fname):
             fname = os.path.join(_get_dataset_dir(), fname)
 
+        embeddings_name = os.path.basename(fname).replace('.dict.pickle', '')
         format = options.format
-
+        print('Loading file {}, embeddings name {}'.format(fname, embeddings_name))
         if not format:
             _, ext = os.path.splitext(fname)
             if ext == ".bin":
@@ -76,12 +86,23 @@ if __name__ == "__main__":
             load_kwargs['dim'] = len(next(open(fname)).split()) - 1
 
         w = load_embedding(fname, format=format, normalize=True, lower=True, clean_words=options.clean_words,
-                           load_kwargs=load_kwargs)
+                           load_kwargs=load_kwargs, name=embeddings_name)
 
-    out_fname = options.output if options.output else "results.csv"
+        print('Loaded {} embeddings'.format(len(w)))
 
-    results = evaluate_on_all(w)
+    if results is not None and w.name in results['embeddings'].values:
+        print("Embeddings {} already calculated in {}; nothing to do here".format(w.name, out_fname))
+        print(results)
+        sys.exit()
+
+    embedding_results = evaluate_on_selection(w)
+
+    if results is not None:
+        results = results.append(embedding_results)
+    else:
+        results = embedding_results
+
 
     logger.info("Saving results...")
     print(results)
-    results.to_csv(out_fname, mode='a')
+    results.to_csv(out_fname, index_label='embeddings', index=False)

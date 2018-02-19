@@ -8,7 +8,7 @@ from .datasets.utils import _get_dataset_dir, _fetch_file
 from .embedding import Embedding
 
 def load_embedding(fname, format="word2vec_bin", normalize=True,
-                   lower=False, clean_words=False, load_kwargs={}):
+                   lower=False, clean_words=False, load_kwargs={}, name='unknown'):
     """
     Loads embeddings from file
 
@@ -46,11 +46,13 @@ def load_embedding(fname, format="word2vec_bin", normalize=True,
         w.normalize_words(inplace=True)
     if lower or clean_words:
         w.standardize_words(lower=lower, clean_words=clean_words, inplace=True)
+    w.set_name(name)
     return w
 
+def __config_name(normalize, lower, clean_words):
+    return ('-norm' if normalize else '') + ('-lower' if lower else '') + ('-clean' if clean_words else '')
 
-
-def fetch_GloVe(dim=300, corpus="wiki-6B", normalize=True, lower=False, clean_words=False):
+def fetch_GloVe(dim=300, corpus="wiki-6B", normalize=True, lower=False, clean_words=True):
     """
     Fetches GloVe embeddings.
 
@@ -135,15 +137,17 @@ def fetch_GloVe(dim=300, corpus="wiki-6B", normalize=True, lower=False, clean_wo
                            uncompress=True,
                            verbose=1)
 
+    name = 'GloVe-'+corpus + str(dim) + __config_name(normalize=normalize, lower=lower, clean_words=clean_words)
     return load_embedding(path.join(_get_dataset_dir("embeddings"), embedding_file[corpus][dim]),
                            format="glove",
                            normalize=normalize,
                            lower=lower, clean_words=clean_words,\
-                           load_kwargs={"vocab_size": vocab_size[corpus], "dim": dim})
+                           load_kwargs={"vocab_size": vocab_size[corpus], "dim": dim}, name=name)
 
 
 
 def fetch_HPCA(which, normalize=True, lower=False, clean_words=False):
+
     """
     Fetches Hellinger PCA based embeddings
 
@@ -183,7 +187,8 @@ def fetch_HPCA(which, normalize=True, lower=False, clean_words=False):
                            uncompress=False,
                            verbose=1)
 
-    return load_embedding(path, format="word2vec_bin", normalize=normalize, lower=lower, clean_words=clean_words)
+    name = 'HPCA-' + which + __config_name(normalize=normalize, lower=lower, clean_words=clean_words)
+    return load_embedding(path, format="word2vec_bin", normalize=normalize, lower=lower, clean_words=clean_words, name=name)
 
 
 
@@ -227,10 +232,8 @@ def fetch_morphoRNNLM(which, normalize=True, lower=False, clean_words=False):
                            uncompress=False,
                            verbose=1)
 
-    return load_embedding(path, format="word2vec_bin", normalize=normalize, lower=lower, clean_words=clean_words)
-
-
-
+    name = 'morphoRNNLM-' + which + __config_name(normalize=normalize, lower=lower, clean_words=clean_words)
+    return load_embedding(path, format="word2vec_bin", normalize=normalize, lower=lower, clean_words=clean_words, name=name)
 
 
 def fetch_NMT(which="DE", normalize=True, lower=False, clean_words=False):
@@ -272,15 +275,15 @@ def fetch_NMT(which="DE", normalize=True, lower=False, clean_words=False):
     assert which in ["DE", "FR"], "Unrecognized which parameter"
 
     fname = {"FR": "Trans_embds/D_RNN_500k_144h.pkl", "DE": "Trans_embds/D_german_50k_500k_168h.pkl"}
-
+    name = 'NMT-' + which + __config_name(normalize=normalize, lower=lower, clean_words=clean_words)
     return load_embedding(path.join(dirname, fname[which]),
                            format="dict",
                            normalize=normalize,
-                           lower=lower, clean_words=clean_words)
+                           lower=lower, clean_words=clean_words, name=name)
 
 
 
-def fetch_PDC(dim=300, normalize=True, lower=False, clean_words=False):
+def fetch_PDC(dim=300, normalize=True, lower=False, clean_words=True):
     """
     Fetches PDC embeddings trained on wiki by Fei Sun
 
@@ -327,11 +330,11 @@ def fetch_PDC(dim=300, normalize=True, lower=False, clean_words=False):
                            uncompress=False,
                            move="pdc/pdc{}.txt.bz2".format(dim),
                            verbose=1)
+    name = 'PDC-' + str(300) + __config_name(normalize=normalize, lower=lower, clean_words=clean_words)
+    return load_embedding(path, format="word2vec", normalize=normalize, lower=lower, clean_words=clean_words, name=name)
 
-    return load_embedding(path, format="word2vec", normalize=normalize, lower=lower, clean_words=clean_words)
 
-
-def fetch_HDC(dim=300, normalize=True, lower=False, clean_words=False):
+def fetch_HDC(dim=300, normalize=True, lower=False, clean_words=True):
     """
     Fetches PDC embeddings trained on wiki by Fei Sun
 
@@ -379,11 +382,12 @@ def fetch_HDC(dim=300, normalize=True, lower=False, clean_words=False):
                            move="hdc/hdc{}.txt.bz2".format(dim),
                            verbose=1)
 
-    return load_embedding(path, format="word2vec", normalize=normalize, lower=lower, clean_words=clean_words)
+    name = 'HDC-' + str(300) + __config_name(normalize=normalize, lower=lower, clean_words=clean_words)
+    return load_embedding(path, format="word2vec", normalize=normalize, lower=lower, clean_words=clean_words, name=name)
 
 
 
-def fetch_SG_GoogleNews(normalize=True, lower=False, clean_words=False):
+def fetch_SG_GoogleNews(normalize=True, lower=False, clean_words=True):
     """
     Fetches SG (skip-gram with negative sampling)
     embeddings trained on GoogleNews dataset published on word2vec website
@@ -413,7 +417,8 @@ def fetch_SG_GoogleNews(normalize=True, lower=False, clean_words=False):
     path = _fetch_file(url="https://www.dropbox.com/s/bnm0trligffakd9/GoogleNews-vectors-negative300.bin.gz?dl=1",
                            data_dir="embeddings",
                            verbose=1)
-    return load_embedding(path, format="word2vec_bin", normalize=normalize, lower=lower, clean_words=clean_words)
+    name = 'SG_GoogleNews-' + __config_name(normalize=normalize, lower=lower, clean_words=clean_words)
+    return load_embedding(path, format="word2vec_bin", normalize=normalize, lower=lower, clean_words=clean_words, name=name)
 
 def fetch_LexVec(which="commoncrawl-W+C", normalize=True, lower=False, clean_words=False):
     """
@@ -455,7 +460,8 @@ def fetch_LexVec(which="commoncrawl-W+C", normalize=True, lower=False, clean_wor
                         data_dir="embeddings",
                         verbose=1)
 
-    return load_embedding(path, format="word2vec", normalize=normalize, lower=lower, clean_words=clean_words)
+    name = 'LexVec-' + which + __config_name(normalize=normalize, lower=lower, clean_words=clean_words)
+    return load_embedding(path, format="word2vec", normalize=normalize, lower=lower, clean_words=clean_words, name=name)
 
 
 def fetch_conceptnet_numberbatch(clean_words=False):
@@ -483,7 +489,8 @@ def fetch_conceptnet_numberbatch(clean_words=False):
                        data_dir='embeddings',
                        uncompress=False,
                        verbose=1)
-    return load_embedding(path, format='word2vec', normalize=False, clean_words=clean_words)
+    name = 'ConceptNetNumberbatch-' + __config_name(normalize=False, lower=False, clean_words=clean_words)
+    return load_embedding(path, format='word2vec', normalize=False, clean_words=clean_words, name=name)
 
 
 def fetch_FastText(lang="en", normalize=True, lower=False, clean_words=False):
@@ -522,7 +529,8 @@ def fetch_FastText(lang="en", normalize=True, lower=False, clean_words=False):
                        uncompress=False,
                        verbose=1)
 
-    return load_embedding(path, format='word2vec', normalize=normalize, lower=lower, clean_words=clean_words)
+    name = 'FastText-' + lang + __config_name(normalize=False, lower=False, clean_words=clean_words)
+    return load_embedding(path, format='word2vec', normalize=normalize, lower=lower, clean_words=clean_words, name=name)
 
 
 # TODO: uncomment after training is finished

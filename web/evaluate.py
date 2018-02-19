@@ -5,6 +5,8 @@
 import logging
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering, KMeans
+
+from web.datasets.synonyms import evaluate_TOEFL, evaluate_ESL
 from .datasets.similarity import fetch_MEN, fetch_WS353, fetch_SimLex999, fetch_MTurk, fetch_RG65, fetch_RW
 from .datasets.categorization import fetch_AP, fetch_battig, fetch_BLESS, fetch_ESSLI_1a, fetch_ESSLI_2b, \
     fetch_ESSLI_2c
@@ -331,11 +333,11 @@ def evaluate_similarity(w, X, y):
     if missing_words > 0:
         logger.warning("Missing {} words. Will replace them with mean vector".format(missing_words))
 
-
     mean_vector = np.mean(w.vectors, axis=0, keepdims=True)
     A = np.vstack(w.get(word, mean_vector) for word in X[:, 0])
     B = np.vstack(w.get(word, mean_vector) for word in X[:, 1])
-    scores = np.array([v1.dot(v2.T)/(np.linalg.norm(v1)*np.linalg.norm(v2)) for v1, v2 in zip(A, B)])
+    norm = lambda v: np.clip(np.linalg.norm(v), 1e-6,np.inf)
+    scores = np.array([v1.dot(v2.T)/(norm(v1)*norm(v2)) for v1, v2 in zip(A, B)])
     return scipy.stats.spearmanr(scores, y).correlation
 
 
@@ -416,3 +418,64 @@ def evaluate_on_all(w):
     results = cat.join(sim).join(analogy)
 
     return results
+
+def evaluate_on_selection(w):
+    """
+    Evaluate Embedding on all fast-running benchmarks
+
+    Parameters
+    ----------
+    w: Embedding or dict
+      Embedding to evaluate.
+
+    Returns
+    -------
+    results: pandas.DataFrame
+      DataFrame with results, one per column.
+    """
+    if isinstance(w, dict):
+        w = Embedding.from_dict(w)
+
+    we_name = {'embeddings':w.name}
+
+    synonym_results={}
+
+    synonym_results['TOEFL'] = evaluate_TOEFL(w)
+    logger.info("TOEFL score {}".format(synonym_results['TOEFL']))
+
+    synonym_results['ESL'] = evaluate_ESL(w)
+    logger.info("ESL score {}".format(synonym_results['ESL']))
+
+
+    # Calculate results on similarity
+    logger.info("Calculating similarity benchmarks")
+    similarity_tasks = {
+        "MEN": fetch_MEN(),
+        "SimLex999": fetch_SimLex999(),
+        "RW": fetch_RW(),
+    }
+
+    similarity_results = {}
+
+    for name, data in iteritems(similarity_tasks):
+        similarity_results[name] = evaluate_similarity(w, data.X, data.y)
+        logger.info("Spearman correlation of scores on {} {}".format(name, similarity_results[name]))
+
+    # Calculate results on categorization
+    logger.info("Calculating categorization benchmarks")
+    categorization_results = {}
+    data = fetch_BLESS()
+    categorization_results["BLESS"] = evaluate_categorization(w, data.X, data.y)
+    logger.info("Cluster purity on BLESS {}".format(name, categorization_results["BLESS"]))
+
+    # Construct pd table
+    name = pd.DataFrame([we_name])
+    syn = pd.DataFrame([synonym_results])
+    sim = pd.DataFrame([similarity_results])
+    cat = pd.DataFrame([categorization_results])
+    results = name.join(syn).join(sim).join(cat)
+
+    results.set_index('embeddings')
+
+    return results
+

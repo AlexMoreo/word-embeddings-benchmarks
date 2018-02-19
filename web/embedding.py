@@ -29,7 +29,8 @@ logger = logging.getLogger(__name__)
 class Embedding(object):
     """ Mapping a vocabulary to a d-dimensional points."""
 
-    def __init__(self, vocabulary, vectors):
+    def __init__(self, vocabulary, vectors, name=None):
+        self.name=name
         self.vocabulary = vocabulary
         self.vectors = np.asarray(vectors)
         if len(self.vocabulary) != self.vectors.shape[0]:
@@ -52,6 +53,9 @@ class Embedding(object):
             self.vectors = np.vstack([self.vectors, v.reshape(1, -1)])
         else:
             self.vectors[self.vocabulary[k]] = v
+
+    def set_name(self, name):
+        self.name=name
 
     def __contains__(self, k):
         return k in self.vocabulary
@@ -234,7 +238,7 @@ class Embedding(object):
         """
         if ord == 2:
             ord = None  # numpy uses this flag to indicate l2.
-        vectors = self.vectors.T / np.linalg.norm(self.vectors, ord, axis=1)
+        vectors = self.vectors.T / np.clip(np.linalg.norm(self.vectors, ord, axis=1), 1e-6,np.inf)
         if inplace:
             self.vectors = vectors.T
             return self
@@ -433,10 +437,10 @@ class Embedding(object):
             return Embedding(vocabulary=OrderedVocabulary(words), vectors=vectors[0:len(words)])
 
     @staticmethod
-    def from_dict(d):
+    def from_dict(d, name=None):
         for k in d:  # Standardize
             d[k] = np.array(d[k]).flatten()
-        return Embedding(vectors=list(d.values()), vocabulary=Vocabulary(d.keys()))
+        return Embedding(vectors=list(d.values()), vocabulary=Vocabulary(d.keys()), name=name)
 
     @staticmethod
     def to_word2vec(w, fname, binary=False):
