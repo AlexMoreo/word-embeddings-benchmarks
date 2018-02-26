@@ -57,8 +57,12 @@ def evaluate_synonyms(e, problems):
 
     meanvec = np.mean(e.vectors, axis=0)
 
+    # with open('synonyms_test_words', 'a') as testw:
     for question,options,answer in problems:
+        # testw.write('\n'.join(options+[question])+'\n')
         if question in e:
+            print('question: ' + question)
+            print(options)
             q_v = e[question].reshape(1, -1)
             q_ops = np.vstack([e[op] if op in e else meanvec for op in options])
             distances = cdist(q_v, q_ops, metric='cosine')[0]

@@ -13,6 +13,7 @@ from .datasets.categorization import fetch_AP, fetch_battig, fetch_BLESS, fetch_
 from web.analogy import *
 from six import iteritems
 from web.embedding import Embedding
+import itertools
 
 logger = logging.getLogger(__name__)
 
@@ -453,20 +454,27 @@ def evaluate_on_selection(w):
         "MEN": fetch_MEN(),
         "SimLex999": fetch_SimLex999(),
         "RW": fetch_RW(),
+        "WS353": fetch_WS353(which="all"),
+        "WS353R": fetch_WS353(which="relatedness"),
+        "WS353S": fetch_WS353(which="similarity"),
+        "MTurk": fetch_MTurk()
     }
 
     similarity_results = {}
 
-    for name, data in iteritems(similarity_tasks):
-        similarity_results[name] = evaluate_similarity(w, data.X, data.y)
-        logger.info("Spearman correlation of scores on {} {}".format(name, similarity_results[name]))
+    with open('sim_test_words', 'w') as testw:
+        for name, data in iteritems(similarity_tasks):
+            testw.write('\n'.join(itertools.chain.from_iterable(data.X.tolist()))+'\n')
+            similarity_results[name] = evaluate_similarity(w, data.X, data.y)
+            logger.info("Spearman correlation of scores on {} {}".format(name, similarity_results[name]))
 
-    # Calculate results on categorization
-    logger.info("Calculating categorization benchmarks")
-    categorization_results = {}
-    data = fetch_BLESS()
-    categorization_results["BLESS"] = evaluate_categorization(w, data.X, data.y)
-    logger.info("Cluster purity on BLESS {}".format(name, categorization_results["BLESS"]))
+        # Calculate results on categorization
+        logger.info("Calculating categorization benchmarks")
+        categorization_results = {}
+        data = fetch_BLESS()
+        categorization_results["BLESS"] = evaluate_categorization(w, data.X, data.y)
+        logger.info("Cluster purity on BLESS {}".format(name, categorization_results["BLESS"]))
+        testw.write('\n'.join(itertools.chain.from_iterable(data.X.tolist())) + '\n')
 
     # Construct pd table
     name = pd.DataFrame([we_name])
